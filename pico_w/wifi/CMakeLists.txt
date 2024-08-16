@@ -18,6 +18,8 @@ else()
     add_subdirectory_exclude_platforms(tcp_server)
     add_subdirectory_exclude_platforms(udp_beacon)
 
+    add_subdirectory_exclude_platforms(ota_update rp2040)
+
     if (NOT PICO_MBEDTLS_PATH)
         message("Skipping tls examples as PICO_MBEDTLS_PATH is not defined")
     else()
