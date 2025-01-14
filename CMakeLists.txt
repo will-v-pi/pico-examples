@@ -1,16 +1,25 @@
 cmake_minimum_required(VERSION 3.12)
 
-# Pull in SDK (must be before project)
-include(pico_sdk_import.cmake)
-include(pico_extras_import_optional.cmake)
+if (NOT DEFINED USING_FIND)
+    set(USING_FIND 0)
+endif()
+
+if (NOT USING_FIND)
+    set(PICO_SDK_PATH "~/pico/pico-sdk")
+    # Pull in SDK (must be before project)
+    include(pico_sdk_import.cmake)
+    include(pico_extras_import_optional.cmake)
+endif()
 
 project(pico_examples C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-if (PICO_SDK_VERSION_STRING VERSION_LESS "2.1.0")
-    message(FATAL_ERROR "Raspberry Pi Pico SDK version 2.1.0 (or later) required. Your version is ${PICO_SDK_VERSION_STRING}")
+if (NOT USING_FIND)
+    if (PICO_SDK_VERSION_STRING VERSION_LESS "2.1.0")
+        message(FATAL_ERROR "Raspberry Pi Pico SDK version 2.1.0 (or later) required. Your version is ${PICO_SDK_VERSION_STRING}")
+    endif()
 endif()
 
 set(PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
@@ -21,7 +30,11 @@ if (NOT DEFINED PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS)
 endif()
 
 # Initialize the SDK
-pico_sdk_init()
+if (USING_FIND)
+    find_package(pico-sdk 2.0.0 REQUIRED CONFIG)
+else()
+    pico_sdk_init()
+endif()
 
 include(example_auto_set_url.cmake)
 
