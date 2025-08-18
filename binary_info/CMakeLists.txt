@@ -1,2 +1,6 @@
-add_subdirectory_exclude_platforms(blink_any host)
-add_subdirectory_exclude_platforms(hello_anything host)
+if (PICO_SUPPORT_CONFIGURABLE_PINS)
+    message("Skipping binary_info examples when using configurable board")
+else()
+    add_subdirectory_exclude_platforms(blink_any host)
+    add_subdirectory_exclude_platforms(hello_anything host)
+endif()

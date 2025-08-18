@@ -1,3 +1,8 @@
+if (PICO_SUPPORT_CONFIGURABLE_PINS)
+    message("Skipping TinyUSB examples as configurable pins are not supported by TinyUSB board_init()")
+    return()
+endif()
+
 if (TARGET tinyusb_device)
     add_subdirectory(device)
 else ()
