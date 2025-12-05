@@ -56,6 +56,9 @@ int main()
     gpio_assign_to_ns(CYW43_DEFAULT_PIN_WL_CLOCK, true);
     gpio_assign_to_ns(CYW43_DEFAULT_PIN_WL_CS, true);
 
+    // Disable SAU before configuring
+    secure_sau_set_enabled(false);
+
     // Configure SAU regions
     secure_sau_configure_split();
 

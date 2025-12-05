@@ -67,6 +67,9 @@ int main()
     printf("Rolled QMI to Non-Secure partition, rc=%d\n", rc);
 #endif
 
+    // Disable SAU before configuring
+    secure_sau_set_enabled(false);
+
     // Configure SAU regions
     secure_sau_configure_split();
 
