@@ -101,6 +101,10 @@
 // Size of buffer to hold descriptors and other data used for enumeration
 #define CFG_TUH_ENUMERATION_BUFSIZE 256
 
+// Enable application-level callbacks for raw tuh_edpt_xfer() calls.
+// Required for picoboot_app.c bulk transfers to work synchronously.
+#define CFG_TUH_API_EDPT_XFER       1
+
 #define CFG_TUH_HUB                 1 // number of supported hubs
 #define CFG_TUH_CDC                 1 // CDC ACM
 #define CFG_TUH_CDC_FTDI            1 // FTDI Serial.  FTDI is not part of CDC class, only to re-use CDC driver API
