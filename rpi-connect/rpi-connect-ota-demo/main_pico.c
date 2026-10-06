@@ -17,6 +17,7 @@
 #include "pico/rpi_connect_ota.h"
 #include "pico/stdio.h"
 #include "pico/unique_id.h"
+#include "pico/secure.h"
 
 static char *rpi_connect_ota_demo_wifi_password;
 static char *rpi_connect_ota_demo_wifi_ssid;
@@ -55,7 +56,19 @@ int main() {
     char *token = NULL;
     int rc = 0;
 
-    stdio_init_all();
+    // stdio_init_all();
+
+    printf("Go NonSecure!\n");
+
+    // Request DMA channels from secure
+    int num_dma_channels = dma_request_unused_channels_from_secure(4);
+    printf("Got %d DMA channels\n", num_dma_channels);
+    // Request user IRQs from secure
+    int num_user_irqs = user_irq_request_unused_from_secure(1);
+    printf("Got %d user IRQs\n", num_user_irqs);
+    // Request PIO from secure
+    int got_pio = pio_request_unused_pio_from_secure();
+    printf("Got PIO: %d\n", got_pio);
 
     pico_get_unique_board_id_string(serial_number, sizeof(serial_number));
 

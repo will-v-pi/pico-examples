@@ -161,16 +161,38 @@ if (NOT PICO_ON_DEVICE)
 endif()
 
 if (PICO_ON_DEVICE)
+    # Add secure monitor
+    add_executable(rpi_connect_secure_monitor secure.c)
+    target_link_libraries(rpi_connect_secure_monitor
+            pico_stdlib
+            hardware_watchdog
+            pico_secure
+    )
+    pico_set_binary_type(rpi_connect_secure_monitor no_flash)
+    pico_package_uf2_output(rpi_connect_secure_monitor 0x10000000)
+    pico_add_extra_outputs(rpi_connect_secure_monitor)
+
     # Add base version
     add_executable(rpi_connect_ota_demo
         main_pico.c
         )
+    target_link_libraries(rpi_connect_ota_demo
+        pico_secure
+    )
+    pico_set_uf2_family(rpi_connect_ota_demo "rp2350-arm-ns")
     # Common finalising for the demo
     finalise_rpi_connect_ota_demo(rpi_connect_ota_demo)
     # Add combined output for easy flashing
-    pico_add_rpi_connect_ota_outputs(rpi_connect_ota_demo default
+    pico_add_rpi_connect_ota_outputs(rpi_connect_ota_demo trustzone
         WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
+        SECURE_TARGET rpi_connect_secure_monitor
+        SECURE_SIZE 64
         )
+    pico_set_security_options(rpi_connect_secure_monitor rpi_connect_ota_demo
+        STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY
+        NONSECURE_TIMER 1
+    )
+    pico_set_security_ram_split(rpi_connect_secure_monitor rpi_connect_ota_demo SIMPLE 64k 2k)
 
     # Add bootsel reset version
     add_executable(rpi_connect_ota_bootsel_demo
