@@ -206,6 +206,78 @@ if (PICO_ON_DEVICE)
         pico_add_rpi_connect_ota_outputs(rpi_connect_ota_packaged_demo default
             WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
             )
+
+        # Add xip_ram chaining bin
+        add_executable(chaining_xip_ram
+            chain_partition_id.c
+            )
+        target_compile_definitions(chaining_xip_ram PRIVATE
+            PICO_ENTER_USB_BOOT_ON_EXIT=1
+            )
+        target_link_libraries(chaining_xip_ram
+            pico_stdlib
+            hardware_flash
+            )
+        pico_set_binary_type(chaining_xip_ram xip_ram)
+        pico_set_linker_script_var(chaining_xip_ram SCRATCH_X_ORIGIN SCRATCH_X_ORIGIN_DEFAULT)
+        pico_set_linker_script_var(chaining_xip_ram SCRATCH_X_LENGTH SCRATCH_X_LENGTH_DEFAULT)
+        pico_set_linker_script_var(chaining_xip_ram SCRATCH_Y_ORIGIN SCRATCH_Y_ORIGIN_DEFAULT)
+        pico_set_linker_script_var(chaining_xip_ram SCRATCH_Y_LENGTH SCRATCH_Y_LENGTH_DEFAULT)
+        pico_minimize_runtime(chaining_xip_ram INCLUDE PRINTF PRINTF_MINIMAL PRINTF_LONG_LONG DEFAULT_ALARM_POOL PANIC FLOAT)
+        target_compile_definitions(chaining_xip_ram PRIVATE PICO_HEAP_SIZE=0x100)
+        pico_package_uf2_output(chaining_xip_ram)
+        # Optionally sign the no_flash binary with your private key, if using secure boot
+        pico_sign_binary(chaining_xip_ram ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_add_extra_outputs(chaining_xip_ram)
+
+        # Add quick chain back
+        add_executable(quick_chain_back
+            quick_chain_back.c
+            )
+        target_link_libraries(quick_chain_back
+            pico_stdlib
+            hardware_flash
+            )
+        pico_set_binary_type(quick_chain_back no_flash)
+        pico_set_uf2_family(quick_chain_back 0xbacc)
+        pico_package_uf2_output(quick_chain_back)
+        # Optionally sign the no_flash binary with your private key, if using secure boot
+        pico_sign_binary(quick_chain_back ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_add_extra_outputs(quick_chain_back)
+        pico_add_tbyb_uf2(quick_chain_back
+            OUTTARGET quick_chain_back_update
+            OUTFILE ${CMAKE_CURRENT_LIST_DIR}/updates/quick_chain_back.uf2
+            )
+
+        # Add packaged no_flash variant with chain
+        add_executable(chaining_ota_packaged
+            main_pico.c
+            )
+        target_compile_definitions(chaining_ota_packaged PRIVATE
+            EXIT_AFTER_MS=2000
+            CHAIN_ON_EXIT_ID=0xbacc
+            )
+        # Packaged no_flash binary
+        pico_set_binary_type(chaining_ota_packaged no_flash)
+        pico_package_uf2_output(chaining_ota_packaged)
+        # Optionally sign the no_flash binary with your private key, if using secure boot
+        pico_sign_binary(chaining_ota_packaged ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        # Common finalising for the demo
+        finalise_rpi_connect_ota_demo(chaining_ota_packaged)
+        # Add combined output for easy flashing
+        pico_use_wifi_firmware_partition(chaining_ota_packaged NO_EMBEDDED_PT NO_TBYB)
+        pico_add_rpi_connect_ota_outputs(chaining_ota_packaged default
+            WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
+            PARTITION_TABLE ${CMAKE_CURRENT_LIST_DIR}/chaining_pt.json
+            COMBINED_TARGET chaining_ota_packaged_pre
+            )
+        # Add other bits to partition table
+        pico_combine_uf2_outputs(chaining_ota_packaged_combined
+            chaining_ota_packaged_pre
+            chaining_xip_ram
+            quick_chain_back
+            PARTITIONS 5 6)
+        add_dependencies(chaining_ota_packaged_combined chaining_ota_packaged_pre)
     endif()
 endif()
 

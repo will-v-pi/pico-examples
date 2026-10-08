@@ -272,6 +272,10 @@ int rpi_connect_ota_demo_main(const char *token) {
         rpi_connect_ota_demo_check_pending_deployment(token);
     }
 
+#ifdef EXIT_AFTER_MS
+    absolute_time_t exit_time = make_timeout_time_ms(EXIT_AFTER_MS);
+#endif
+
     while (1) {
         // A real application does its non-OTA work here. With a polled async
         // context the network only makes progress inside async_context_poll(),
@@ -294,6 +298,13 @@ int rpi_connect_ota_demo_main(const char *token) {
             rc = -1;
             break;
         }
+
+#ifdef EXIT_AFTER_MS
+        if (time_reached(exit_time) && !update_ctx) {
+            break;
+        }
+#endif
+
         sleep_ms(10);
     }
 
