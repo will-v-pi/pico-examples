@@ -4,6 +4,8 @@
 #include "hardware/watchdog.h"
 #include "pico/secure.h"
 #include "hardware/flash.h"
+#include "pico/rpi_connect_identity.h"
+#include "hardware/structs/otp.h"
 
 
 // Value watchdog_enable() leaves in watchdog scratch 4. Any reboot (rom_reboot() or watchdog_reboot())
@@ -75,6 +77,22 @@ int main()
     secure_set_nonsecure_flash_erase_helper_enabled(true);
 #endif
     rom_set_ns_api_permission(BOOTROM_NS_API_reboot, true);
+
+    // For testing: soft lock the OTP page(s) holding the device identity private key, so
+    // NonSecure can't read it (directly, or via the bootrom otp_access API). This only lasts
+    // until the next reset - for production, set the permanent page locks when provisioning.
+    const uint first_key_page = RPI_CONNECT_IDENTITY_OTP_ROW / NUM_OTP_PAGE_ROWS;
+    const uint last_key_page = (RPI_CONNECT_IDENTITY_OTP_ROW + 15) / NUM_OTP_PAGE_ROWS;
+    for (uint page = first_key_page; page <= last_key_page; page++) {
+        // Writes can only advance the lock state, so this leaves the Secure lock unchanged
+        otp_hw->sw_lock[page] = otp_hw->sw_lock[page] |
+            (OTP_SW_LOCK0_NSEC_VALUE_INACCESSIBLE << OTP_SW_LOCK0_NSEC_LSB);
+        printf("OTP page %u soft locked for NonSecure, SW_LOCK=%x\n", page, (unsigned)otp_hw->sw_lock[page]);
+    }
+
+    // Let NonSecure use the device identity key, without exposing the private key
+    rc = rpi_connect_identity_secure_init();
+    printf("Device identity key secure calls %s (rc=%d)\n", rc == BOOTROM_OK ? "enabled" : "failed", rc);
 
     // Configure SAU regions
     secure_sau_configure_split();

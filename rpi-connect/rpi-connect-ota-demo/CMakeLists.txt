@@ -167,7 +167,12 @@ if (PICO_ON_DEVICE)
             pico_stdlib
             hardware_watchdog
             pico_secure
+            # The device identity private key is only handled by the secure monitor
+            pico_rpi_connect_identity_key
+            pico_rpi_connect_identity_key_default_config_headers
     )
+    # For the optional build-time debug identity key (device_identity_keys.h, see debug_options.cmake)
+    target_include_directories(rpi_connect_secure_monitor PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     pico_set_binary_type(rpi_connect_secure_monitor no_flash)
     pico_package_uf2_output(rpi_connect_secure_monitor 0x10000000)
     pico_add_extra_outputs(rpi_connect_secure_monitor)
@@ -192,7 +197,7 @@ if (PICO_ON_DEVICE)
         STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY UF2_TARGET_PARTITION FLASH_OP
         NONSECURE_TIMER 1
     )
-    pico_set_security_ram_split(rpi_connect_secure_monitor rpi_connect_ota_demo SIMPLE 64k 2k)
+    pico_set_security_ram_split(rpi_connect_secure_monitor rpi_connect_ota_demo SIMPLE 80k 2k)
 
     # Add bootsel reset version
     add_executable(rpi_connect_ota_bootsel_demo
