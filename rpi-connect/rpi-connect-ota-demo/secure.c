@@ -6,7 +6,16 @@
 #include "hardware/flash.h"
 
 
+// Value watchdog_enable() leaves in watchdog scratch 4. Any reboot (rom_reboot() or watchdog_reboot())
+// overwrites it, so if it has changed then a reboot is pending and the watchdog must not be fed,
+// otherwise the reboot would never happen.
+static uint32_t watchdog_enabled_scratch4;
+
 bool repeating_timer_callback(__unused struct repeating_timer *t) {
+    if (watchdog_hw->scratch[4] != watchdog_enabled_scratch4) {
+        // Reboot pending - stop feeding the watchdog
+        return false;
+    }
     watchdog_update();
     return true;
 }
@@ -36,6 +45,7 @@ int main()
     // Create a repeating timer to update the watchdog every 100ms
     struct repeating_timer timer;
     watchdog_enable(110, true);
+    watchdog_enabled_scratch4 = watchdog_hw->scratch[4];
     add_repeating_timer_ms(-100, repeating_timer_callback, NULL, &timer);
 
     // Get boot partition
@@ -60,6 +70,10 @@ int main()
     rom_set_ns_api_permission(BOOTROM_NS_API_get_partition_table_info, true);
     rom_set_ns_api_permission(BOOTROM_NS_API_get_b_partition, true);
     rom_set_ns_api_permission(BOOTROM_NS_API_checked_flash_op, true);
+#if PICO_ADD_NONSECURE_FLASH_ERASE_HELPER
+    // RP2350 A2 bootrom faults on non-secure flash_op erases, so secure performs them instead
+    secure_set_nonsecure_flash_erase_helper_enabled(true);
+#endif
     rom_set_ns_api_permission(BOOTROM_NS_API_reboot, true);
 
     // Configure SAU regions

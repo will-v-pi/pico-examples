@@ -189,7 +189,7 @@ if (PICO_ON_DEVICE)
         SECURE_SIZE 64
         )
     pico_set_security_options(rpi_connect_secure_monitor rpi_connect_ota_demo
-        STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY
+        STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY UF2_TARGET_PARTITION FLASH_OP
         NONSECURE_TIMER 1
     )
     pico_set_security_ram_split(rpi_connect_secure_monitor rpi_connect_ota_demo SIMPLE 64k 2k)
