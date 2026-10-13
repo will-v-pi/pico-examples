@@ -122,7 +122,11 @@ if (PICO_ON_DEVICE)
         )
 endif()
 
+# finalise_rpi_connect_ota_demo(TARGET [EMBEDDED])
+# EMBEDDED: TARGET is embedded in the Secure binary (see pico_embed_nonsecure_binary), so has no
+# metadata block, and the Secure binary is versioned and hashed instead
 function(finalise_rpi_connect_ota_demo TARGET)
+    cmake_parse_arguments(PARSE_ARGV 1 OPT "EMBEDDED" "" "")
     target_link_libraries(${TARGET} rpi_connect_ota_demo_libs)
     # Program version reported at boot and by picotool info. The picobin image
     # VERSION used for bootrom A/B selection is set separately below from
@@ -136,11 +140,13 @@ function(finalise_rpi_connect_ota_demo TARGET)
     # before pico_add_extra_outputs(), which configures the picotool seal step.
     # The UF2 this build produces is the artefact to provision and to deploy via
     # Connect - it does not need re-sealing downstream.
-    pico_set_binary_version(${TARGET}
-        MAJOR ${RPI_CONNECT_VERSION_MAJOR}
-        MINOR ${RPI_CONNECT_BUILD_NUMBER}
-        )
-    pico_hash_binary(${TARGET})
+    if (NOT OPT_EMBEDDED)
+        pico_set_binary_version(${TARGET}
+            MAJOR ${RPI_CONNECT_VERSION_MAJOR}
+            MINOR ${RPI_CONNECT_BUILD_NUMBER}
+            )
+        pico_hash_binary(${TARGET})
+    endif()
 
     # add url via pico_set_program_url
     example_auto_set_url(${TARGET})
@@ -166,7 +172,7 @@ if (PICO_ON_DEVICE)
     target_link_libraries(rpi_connect_secure_monitor
             pico_stdlib
             hardware_watchdog
-            pico_secure
+            pico_trustzone
             # The device identity private key is only handled by the secure monitor
             pico_rpi_connect_identity_key
             pico_rpi_connect_identity_key_default_config_headers
@@ -174,7 +180,7 @@ if (PICO_ON_DEVICE)
     # For the optional build-time debug identity key (device_identity_keys.h, see debug_options.cmake)
     target_include_directories(rpi_connect_secure_monitor PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     pico_set_binary_type(rpi_connect_secure_monitor no_flash)
-    pico_package_uf2_output(rpi_connect_secure_monitor 0x10000000)
+    pico_package_uf2_output(rpi_connect_secure_monitor)
     pico_add_extra_outputs(rpi_connect_secure_monitor)
 
     # Add base version
@@ -182,7 +188,7 @@ if (PICO_ON_DEVICE)
         main_pico.c
         )
     target_link_libraries(rpi_connect_ota_demo
-        pico_secure
+        pico_trustzone
     )
     pico_set_uf2_family(rpi_connect_ota_demo "rp2350-arm-ns")
     # Common finalising for the demo
@@ -203,35 +209,87 @@ if (PICO_ON_DEVICE)
     add_executable(rpi_connect_ota_bootsel_demo
         main_pico.c
         )
+    target_link_libraries(rpi_connect_ota_bootsel_demo
+        pico_trustzone
+    )
     target_compile_definitions(rpi_connect_ota_bootsel_demo PRIVATE
         # Exit immediately
         EXIT_IMMEDIATELY=1
         # Reset to BOOTSEL on exit
         PICO_ENTER_USB_BOOT_ON_EXIT=1
         )
+    pico_set_uf2_family(rpi_connect_ota_bootsel_demo "rp2350-arm-ns")
     # Common finalising for the demo
     finalise_rpi_connect_ota_demo(rpi_connect_ota_bootsel_demo)
-    pico_add_rpi_connect_ota_outputs(rpi_connect_ota_bootsel_demo default
+    pico_add_rpi_connect_ota_outputs(rpi_connect_ota_bootsel_demo trustzone
         WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
+        SECURE_TARGET rpi_connect_secure_monitor
+        SECURE_SIZE 64
         )
+    pico_set_security_options(rpi_connect_secure_monitor rpi_connect_ota_bootsel_demo
+        STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY UF2_TARGET_PARTITION FLASH_OP
+        NONSECURE_TIMER 1
+    )
+    pico_set_security_ram_split(rpi_connect_secure_monitor rpi_connect_ota_bootsel_demo SIMPLE 80k 2k)
 
     if (PICO_RP2040)
         message("Skipping rpi_connect_ota_packaged_demo example which is unsupported on this platform")
     else()
-        # Add packaged no_flash variant
+        # Add packaged no_flash variant, where the no_flash NonSecure binary is embedded in the
+        # packaged Secure binary, so the bootrom loads both into SRAM
+        # Add secure monitor
+        add_executable(rpi_connect_packaged_secure_monitor secure.c)
+        target_link_libraries(rpi_connect_packaged_secure_monitor
+                pico_stdlib
+                hardware_watchdog
+                pico_trustzone
+                # The device identity private key is only handled by the secure monitor
+                pico_rpi_connect_identity_key
+                pico_rpi_connect_identity_key_default_config_headers
+        )
+        # For the optional build-time debug identity key (device_identity_keys.h, see debug_options.cmake)
+        target_include_directories(rpi_connect_packaged_secure_monitor PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        pico_set_binary_type(rpi_connect_packaged_secure_monitor no_flash)
+        # Optimise for size whatever the build type, to leave more SRAM for NonSecure
+        target_compile_options(rpi_connect_packaged_secure_monitor PRIVATE -Os)
+        pico_package_uf2_output(rpi_connect_packaged_secure_monitor)
+        # The Secure binary is the one booted (and selected between A/B partitions), so it has the
+        # version and hash, and the signature which also covers the embedded NonSecure binary
+        pico_set_binary_version(rpi_connect_packaged_secure_monitor
+            MAJOR ${RPI_CONNECT_VERSION_MAJOR}
+            MINOR ${RPI_CONNECT_BUILD_NUMBER}
+            )
+        pico_hash_binary(rpi_connect_packaged_secure_monitor)
+        # Optionally sign the binary with your private key, if using secure boot
+        pico_sign_binary(rpi_connect_packaged_secure_monitor ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_add_extra_outputs(rpi_connect_packaged_secure_monitor)
+
         add_executable(rpi_connect_ota_packaged_demo
             main_pico.c
             )
-        # Packaged no_flash binary
+        target_link_libraries(rpi_connect_ota_packaged_demo
+            pico_trustzone
+        )
+        # no_flash binary, embedded in the Secure binary
         pico_set_binary_type(rpi_connect_ota_packaged_demo no_flash)
-        pico_package_uf2_output(rpi_connect_ota_packaged_demo)
-        # Optionally sign the no_flash binary with your private key, if using secure boot
-        pico_sign_binary(rpi_connect_ota_packaged_demo ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_set_uf2_family(rpi_connect_ota_packaged_demo "rp2350-arm-ns")
+        # Optimise for size whatever the build type, as the code is in SRAM too
+        target_compile_options(rpi_connect_ota_packaged_demo PRIVATE -Os)
+        # Leave more heap for the TLS buffers, with the fewest lwIP packet buffers (~1.5k each) which
+        # still hold the whole TCP window (TCP_WND), so the download speed isn't affected
+        target_compile_definitions(rpi_connect_ota_packaged_demo PRIVATE PBUF_POOL_SIZE=23)
         # Common finalising for the demo
-        finalise_rpi_connect_ota_demo(rpi_connect_ota_packaged_demo)
+        finalise_rpi_connect_ota_demo(rpi_connect_ota_packaged_demo EMBEDDED)
+        pico_set_security_options(rpi_connect_packaged_secure_monitor rpi_connect_ota_packaged_demo
+            STDIO RAND DMA USER_IRQ PIO GPIO USB BOOTROM_LOCKING PICK_AB ROLL_PARTITION BUY UF2_TARGET_PARTITION FLASH_OP
+            NONSECURE_TIMER 1
+        )
+        pico_set_security_ram_split(rpi_connect_packaged_secure_monitor rpi_connect_ota_packaged_demo SIMPLE 68k 2k NO_FLASH)
+        pico_embed_nonsecure_binary(rpi_connect_packaged_secure_monitor rpi_connect_ota_packaged_demo)
         # Add combined output for easy flashing
         pico_add_rpi_connect_ota_outputs(rpi_connect_ota_packaged_demo default
             WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
+            SECURE_TARGET rpi_connect_packaged_secure_monitor
             )
     endif()
 endif()
