@@ -207,94 +207,65 @@ if (PICO_ON_DEVICE)
             WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
             )
 
-        # Add tiny chaining bin
-        add_executable(chaining_tiny
-            chain_partition_id.c
-            )
-        target_link_libraries(chaining_tiny
-            pico_stdlib
-            hardware_flash
-            )
-        set(RAM_START SCRATCH_X_ORIGIN_DEFAULT)
-        set(RAM_SIZE 0xb00)
-        set(STACK_END 0x50101000)
-        set(STACK_SIZE 0x300)
-        # RAM is write-protected with the MPU during chaining, which has 32 byte granularity
-        math(EXPR RAM_SIZE_ALIGNMENT "${RAM_SIZE} & 0x1f")
-        if (NOT RAM_SIZE_ALIGNMENT EQUAL 0)
-            message(FATAL_ERROR "chaining_tiny RAM_SIZE must be a multiple of 32 bytes")
-        endif()
-        pico_set_binary_type(chaining_tiny no_flash)
-        pico_set_linker_script_var(chaining_tiny RAM_ORIGIN ${RAM_START})
-        pico_set_linker_script_var(chaining_tiny RAM_LENGTH ${RAM_SIZE})
-        pico_set_linker_script_var(chaining_tiny SCRATCH_X_ORIGIN 0)
-        pico_set_linker_script_var(chaining_tiny SCRATCH_X_LENGTH 0)
-        pico_set_linker_script_var(chaining_tiny SCRATCH_Y_ORIGIN ${STACK_END}-${STACK_SIZE})
-        pico_set_linker_script_var(chaining_tiny SCRATCH_Y_LENGTH ${STACK_SIZE})
-        pico_minimize_runtime(chaining_tiny INCLUDE)
-        pico_enable_stdio_uart(chaining_tiny 0)
-        target_compile_definitions(chaining_tiny PRIVATE 
-            PICO_HEAP_SIZE=0 # doesn't use heap
-            PICO_STACK_SIZE=${STACK_SIZE} # small stack
-            PICO_USE_STACK_GUARDS=1 # with stack guards
-            PICO_STDIO_UART_SUPPORT_CHARS_AVAILABLE_CALLBACK=0 # avoids pulling in irq code
-            NDEBUG # strip assertion strings
-        )
-        target_compile_options(chaining_tiny PRIVATE -Os)
-        target_link_options(chaining_tiny PRIVATE -Wl,--print-memory-usage)
-        pico_package_uf2_output(chaining_tiny)
-        # Optionally sign the no_flash binary with your private key, if using secure boot
-        pico_sign_binary(chaining_tiny ${CMAKE_CURRENT_LIST_DIR}/private.pem)
-        pico_add_extra_outputs(chaining_tiny)
-
         # Add quick chain back
-        add_executable(quick_chain_back
-            quick_chain_back.c
+        add_executable(rpi_connect_chained_demo
+            main_chained.c
             )
-        target_link_libraries(quick_chain_back
+        target_link_libraries(rpi_connect_chained_demo
             pico_stdlib
             hardware_flash
             )
-        pico_set_binary_type(quick_chain_back no_flash)
-        pico_set_uf2_family(quick_chain_back 0xbacc)
-        pico_package_uf2_output(quick_chain_back)
+        pico_set_binary_type(rpi_connect_chained_demo no_flash)
+        pico_set_uf2_family(rpi_connect_chained_demo 0x6d61696e)
+        pico_package_uf2_output(rpi_connect_chained_demo)
         # Optionally sign the no_flash binary with your private key, if using secure boot
-        pico_sign_binary(quick_chain_back ${CMAKE_CURRENT_LIST_DIR}/private.pem)
-        pico_add_extra_outputs(quick_chain_back)
-        pico_add_tbyb_uf2(quick_chain_back
-            OUTTARGET quick_chain_back_update
-            OUTFILE ${CMAKE_CURRENT_LIST_DIR}/updates/quick_chain_back.uf2
+        pico_sign_binary(rpi_connect_chained_demo ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        # Add version
+        pico_set_binary_version(rpi_connect_chained_demo
+            MAJOR ${RPI_CONNECT_VERSION_MAJOR}
+            MINOR ${RPI_CONNECT_BUILD_NUMBER}
             )
+        target_compile_definitions(rpi_connect_chained_demo PRIVATE
+            VERSION_MAJOR=${RPI_CONNECT_VERSION_MAJOR}
+            VERSION_MINOR=${RPI_CONNECT_BUILD_NUMBER}
+            )
+        pico_add_extra_outputs(rpi_connect_chained_demo)
+        # pico_add_tbyb_uf2(rpi_connect_chained_demo
+        #     OUTTARGET rpi_connect_chained_demo_update
+        #     OUTFILE ${CMAKE_CURRENT_LIST_DIR}/updates/rpi_connect_chained_demo.uf2
+        #     )
 
         # Add packaged no_flash variant with chain
-        add_executable(chaining_ota_packaged
+        add_executable(rpi_connect_ota_chaining_demo
             main_pico.c
             )
-        target_compile_definitions(chaining_ota_packaged PRIVATE
+        target_compile_definitions(rpi_connect_ota_chaining_demo PRIVATE
             EXIT_AFTER_MS=2000
-            CHAIN_ON_EXIT_ID=0xbaccbaccbacc
+            CHAIN_ON_EXIT_ID=0x6d61696e
+            RPI_CONNECT_OTA_DEMO_POLL_ONLY=1
             )
         # Packaged no_flash binary
-        pico_set_binary_type(chaining_ota_packaged no_flash)
-        pico_package_uf2_output(chaining_ota_packaged)
+        pico_set_binary_type(rpi_connect_ota_chaining_demo no_flash)
+        pico_set_uf2_family(rpi_connect_ota_chaining_demo 0x636e6374)
+        pico_package_uf2_output(rpi_connect_ota_chaining_demo)
         # Optionally sign the no_flash binary with your private key, if using secure boot
-        pico_sign_binary(chaining_ota_packaged ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_sign_binary(rpi_connect_ota_chaining_demo ${CMAKE_CURRENT_LIST_DIR}/private.pem)
         # Common finalising for the demo
-        finalise_rpi_connect_ota_demo(chaining_ota_packaged)
+        finalise_rpi_connect_ota_demo(rpi_connect_ota_chaining_demo)
         # Add combined output for easy flashing
-        pico_use_wifi_firmware_partition(chaining_ota_packaged NO_EMBEDDED_PT NO_TBYB)
-        pico_add_rpi_connect_ota_outputs(chaining_ota_packaged default
+        pico_add_rpi_connect_ota_outputs(rpi_connect_ota_chaining_demo default
             WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
             PARTITION_TABLE ${CMAKE_CURRENT_LIST_DIR}/chaining_pt.json
-            COMBINED_TARGET chaining_ota_packaged_pre
+            COMBINED_TARGET rpi_connect_ota_chaining_demo_pre
+            UPDATE_TARGETS rpi_connect_chained_demo
+            PARTITIONS 2 3 4 5 6
             )
         # Add other bits to partition table
-        pico_combine_uf2_outputs(chaining_ota_packaged_combined
-            chaining_ota_packaged_pre
-            chaining_tiny
-            quick_chain_back
-            PARTITIONS 5 6)
-        add_dependencies(chaining_ota_packaged_combined chaining_ota_packaged_pre)
+        pico_combine_uf2_outputs(rpi_connect_ota_chaining_demo_combined
+            rpi_connect_ota_chaining_demo_pre
+            rpi_connect_chained_demo
+            PARTITIONS 0)
+        add_dependencies(rpi_connect_ota_chaining_demo_combined rpi_connect_ota_chaining_demo_pre)
     endif()
 endif()
 

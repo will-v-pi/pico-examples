@@ -11,9 +11,9 @@
   "partitions": [
     {
       "name": "Main A",
-      "id": "0xbace",
+      "id": "0x6d61696e",
       "size": "520K",
-      "families": ["rp2350-arm-s", "rp2350-riscv"],
+      "families": ["0x6d61696e"],
       "permissions": {
         "secure": "rw",
         "nonsecure": "rw",
@@ -22,15 +22,38 @@
     },
     {
       "name": "Main B",
-      "id": "0xbace",
+      "id": "0x6d61696e",
       "size": "520K",
-      "families": ["rp2350-arm-s", "rp2350-riscv"],
+      "families": ["0x6d61696e"],
       "permissions": {
         "secure": "rw",
         "nonsecure": "rw",
         "bootloader": "rw"
       },
-      "link": ["a", 0]
+      "link": ["a", -1]
+    },
+    {
+      "name": "Connect A",
+      "id": "0x636e6374",
+      "size": "520K",
+      "families": ["0x636e6374"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "rw",
+        "bootloader": "rw"
+      }
+    },
+    {
+      "name": "Connect B",
+      "id": "0x636e6374",
+      "size": "520K",
+      "families": ["0x636e6374"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "rw",
+        "bootloader": "rw"
+      },
+      "link": ["a", -1]
     },
     {
       "name": "Firmware A",
@@ -54,7 +77,7 @@
         "nonsecure": "rw",
         "bootloader": "rw"
       },
-      "link": ["a", 2],
+      "link": ["a", -1],
       "ignored_during_riscv_boot": true
     },
     {
@@ -67,40 +90,6 @@
         "nonsecure": "rw",
         "bootloader": "rw"
       }
-    },
-    {
-      "name": "XIP RAM Chainer",
-      "id": "0xc4a1",
-      "size": "16K",
-      "families": ["0xc4a1"],
-      "permissions": {
-        "secure": "rw",
-        "nonsecure": "rw",
-        "bootloader": "rw"
-      }
-    },
-    {
-      "name": "Extra A",
-      "id": "0xbaccbaccbacc",
-      "size": "520K",
-      "families": ["0xbacc"],
-      "permissions": {
-        "secure": "rw",
-        "nonsecure": "rw",
-        "bootloader": "rw"
-      }
-    },
-    {
-      "name": "Extra B",
-      "id": "0xbaccbaccbacc",
-      "size": "520K",
-      "families": ["0xbacc"],
-      "permissions": {
-        "secure": "rw",
-        "nonsecure": "rw",
-        "bootloader": "rw"
-      },
-      "link": ["a", 0]
     }
   ]
 }

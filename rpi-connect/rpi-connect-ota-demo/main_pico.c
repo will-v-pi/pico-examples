@@ -166,28 +166,39 @@ end:
 #ifdef CHAIN_ON_EXIT_ID
     uint64_t chain_id = CHAIN_ON_EXIT_ID;
     printf("Chain on exit to ID %" PRIx64 "\n", chain_id);
-    uint64_t * chain_id_ptr = (uint64_t*)(&powman_hw->scratch[0]);
-    *chain_id_ptr = chain_id;
-    printf("Written %" PRIx64 "\n", *chain_id_ptr);
-    powman_hw->scratch[2] = USBCTRL_DPRAM_BASE;
-    printf("Using workarea %" PRIx32 "\n", powman_hw->scratch[2]);
-    uint8_t* workarea = malloc(0x1000);
-    
-    // maximum of 16 partitions, each with maximum of 4 words returned, plus 1
-    uint32_t buffer[(16 * 4) + 1] = { };
-    int ret = rom_get_partition_table_info(buffer, count_of(buffer), PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (5 << 24));
-    hard_assert(buffer[0] == (PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION));
-    hard_assert(ret == 3);
+    uint32_t* workarea = malloc(0x1000);
+    int picked_p = rom_pick_ab_partition_by_id(workarea, 0x1000, chain_id, false);
+    free(workarea);
+
+    uint32_t buffer[4 + 1] = {}; // single partition, with maximum of 4 words returned, plus 1
+    int ret = rom_get_partition_table_info(buffer, count_of(buffer), PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (picked_p << 24));
+    if (
+        buffer[0] != (PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION)
+        || ret != 3
+    ) {
+        printf("rom_get_partition_table_info returned %d with buffer[0] %08x\n", ret, buffer[0]);
+        return ret;
+    }
 
     uint32_t location_and_permissions = buffer[1];
     uint32_t saddr = ((location_and_permissions >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB) & 0x1fffu) * FLASH_SECTOR_SIZE;
     uint32_t eaddr = (((location_and_permissions >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB) & 0x1fffu) + 1) * FLASH_SECTOR_SIZE;
-    printf("Chaining to %08x\n", XIP_BASE + saddr);
+
+    int32_t chain_addr = XIP_BASE + saddr;
+    if (rom_get_last_boot_type_with_chained_flag() == BOOT_TYPE_FLASH_UPDATE) {
+        boot_info_t boot_info = {};
+        int ret = rom_get_boot_info(&boot_info);
+        if (ret) {
+            uint32_t flash_update_base = boot_info.reboot_params[0];
+            if (flash_update_base == (uint32_t)chain_addr) {
+                chain_addr = -chain_addr;
+            }
+        }
+    }
+
+    printf("Chaining to %08x%s\n", abs(chain_addr), chain_addr < 0 ? " (update)" : "");
     stdio_deinit_all();
-    rc = rom_chain_image(workarea, 0x1000, XIP_BASE + saddr, eaddr - saddr);
-    stdio_init_all();
-    printf("rom_chain_image returned %d\n", rc);
-    free(workarea);
+    rom_chain_image_no_return(chain_addr, eaddr - saddr);
 #endif
 
     return rc;
