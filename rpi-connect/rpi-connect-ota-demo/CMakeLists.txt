@@ -263,8 +263,8 @@ if (PICO_ON_DEVICE)
         # Add other bits to partition table
         pico_combine_uf2_outputs(rpi_connect_ota_chaining_demo_combined
             rpi_connect_ota_chaining_demo_pre
-            rpi_connect_chained_demo
-            PARTITIONS 0)
+            rpi_connect_chained_demo rpi_connect_ota_chaining_demo_erase
+            PARTITIONS 0 1)
         add_dependencies(rpi_connect_ota_chaining_demo_combined rpi_connect_ota_chaining_demo_pre)
     endif()
 endif()
