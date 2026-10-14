@@ -165,11 +165,12 @@ end:
 
 #ifdef CHAIN_ON_EXIT_ID
     uint64_t chain_id = CHAIN_ON_EXIT_ID;
-    uint64_t * chain_id_ptr = (uint64_t*)(powman_hw->scratch);
     printf("Chain on exit to ID %" PRIx64 "\n", chain_id);
-    // xip_cache_pin_range(XIP_SRAM_END - sizeof(uint64_t) - XIP_BASE, sizeof(uint64_t));
+    uint64_t * chain_id_ptr = (uint64_t*)(&powman_hw->scratch[0]);
     *chain_id_ptr = chain_id;
-    printf("Pinned and written %" PRIx64 "\n", *chain_id_ptr);
+    printf("Written %" PRIx64 "\n", *chain_id_ptr);
+    powman_hw->scratch[2] = USBCTRL_DPRAM_BASE;
+    printf("Using workarea %" PRIx32 "\n", powman_hw->scratch[2]);
     uint8_t* workarea = malloc(0x1000);
     
     // maximum of 16 partitions, each with maximum of 4 words returned, plus 1

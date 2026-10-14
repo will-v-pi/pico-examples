@@ -14,12 +14,14 @@ int main() {
     printf("Hello from version 1 of quick chain back\n");
 
     uint64_t chain_id = 0xbace;
-    uint64_t * chain_id_ptr = (uint64_t*)(powman_hw->scratch);
     printf("Chaining ID %" PRIx64 "\n", chain_id);
+    uint64_t * chain_id_ptr = (uint64_t*)(&powman_hw->scratch[0]);
     *chain_id_ptr = chain_id;
-    printf("Pinned and written %" PRIx64 "\n", *chain_id_ptr);
+    printf("Written %" PRIx64 "\n", *chain_id_ptr);
+    powman_hw->scratch[2] = USBCTRL_DPRAM_BASE;
+    printf("Using workarea %" PRIx32 "\n", powman_hw->scratch[2]);
     uint8_t* workarea = malloc(0x1000);
-    
+
     // maximum of 16 partitions, each with maximum of 4 words returned, plus 1
     uint32_t buffer[(16 * 4) + 1] = { };
     int ret = rom_get_partition_table_info(buffer, count_of(buffer), PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (5 << 24));

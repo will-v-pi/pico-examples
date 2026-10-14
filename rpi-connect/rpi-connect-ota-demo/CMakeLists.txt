@@ -207,28 +207,45 @@ if (PICO_ON_DEVICE)
             WIFI_SSID ${WIFI_SSID} WIFI_PASSWORD ${WIFI_PASSWORD}
             )
 
-        # Add xip_ram chaining bin
-        add_executable(chaining_xip_ram
+        # Add tiny chaining bin
+        add_executable(chaining_tiny
             chain_partition_id.c
             )
-        target_compile_definitions(chaining_xip_ram PRIVATE
-            PICO_ENTER_USB_BOOT_ON_EXIT=1
-            )
-        target_link_libraries(chaining_xip_ram
+        target_link_libraries(chaining_tiny
             pico_stdlib
             hardware_flash
             )
-        pico_set_binary_type(chaining_xip_ram xip_ram)
-        pico_set_linker_script_var(chaining_xip_ram SCRATCH_X_ORIGIN SCRATCH_X_ORIGIN_DEFAULT)
-        pico_set_linker_script_var(chaining_xip_ram SCRATCH_X_LENGTH SCRATCH_X_LENGTH_DEFAULT)
-        pico_set_linker_script_var(chaining_xip_ram SCRATCH_Y_ORIGIN SCRATCH_Y_ORIGIN_DEFAULT)
-        pico_set_linker_script_var(chaining_xip_ram SCRATCH_Y_LENGTH SCRATCH_Y_LENGTH_DEFAULT)
-        pico_minimize_runtime(chaining_xip_ram INCLUDE PRINTF PRINTF_MINIMAL PRINTF_LONG_LONG DEFAULT_ALARM_POOL PANIC FLOAT)
-        target_compile_definitions(chaining_xip_ram PRIVATE PICO_HEAP_SIZE=0x100)
-        pico_package_uf2_output(chaining_xip_ram)
+        set(RAM_START SCRATCH_X_ORIGIN_DEFAULT)
+        set(RAM_SIZE 0xb00)
+        set(STACK_END 0x50101000)
+        set(STACK_SIZE 0x300)
+        # RAM is write-protected with the MPU during chaining, which has 32 byte granularity
+        math(EXPR RAM_SIZE_ALIGNMENT "${RAM_SIZE} & 0x1f")
+        if (NOT RAM_SIZE_ALIGNMENT EQUAL 0)
+            message(FATAL_ERROR "chaining_tiny RAM_SIZE must be a multiple of 32 bytes")
+        endif()
+        pico_set_binary_type(chaining_tiny no_flash)
+        pico_set_linker_script_var(chaining_tiny RAM_ORIGIN ${RAM_START})
+        pico_set_linker_script_var(chaining_tiny RAM_LENGTH ${RAM_SIZE})
+        pico_set_linker_script_var(chaining_tiny SCRATCH_X_ORIGIN 0)
+        pico_set_linker_script_var(chaining_tiny SCRATCH_X_LENGTH 0)
+        pico_set_linker_script_var(chaining_tiny SCRATCH_Y_ORIGIN ${STACK_END}-${STACK_SIZE})
+        pico_set_linker_script_var(chaining_tiny SCRATCH_Y_LENGTH ${STACK_SIZE})
+        pico_minimize_runtime(chaining_tiny INCLUDE)
+        pico_enable_stdio_uart(chaining_tiny 0)
+        target_compile_definitions(chaining_tiny PRIVATE 
+            PICO_HEAP_SIZE=0 # doesn't use heap
+            PICO_STACK_SIZE=${STACK_SIZE} # small stack
+            PICO_USE_STACK_GUARDS=1 # with stack guards
+            PICO_STDIO_UART_SUPPORT_CHARS_AVAILABLE_CALLBACK=0 # avoids pulling in irq code
+            NDEBUG # strip assertion strings
+        )
+        target_compile_options(chaining_tiny PRIVATE -Os)
+        target_link_options(chaining_tiny PRIVATE -Wl,--print-memory-usage)
+        pico_package_uf2_output(chaining_tiny)
         # Optionally sign the no_flash binary with your private key, if using secure boot
-        pico_sign_binary(chaining_xip_ram ${CMAKE_CURRENT_LIST_DIR}/private.pem)
-        pico_add_extra_outputs(chaining_xip_ram)
+        pico_sign_binary(chaining_tiny ${CMAKE_CURRENT_LIST_DIR}/private.pem)
+        pico_add_extra_outputs(chaining_tiny)
 
         # Add quick chain back
         add_executable(quick_chain_back
@@ -255,7 +272,7 @@ if (PICO_ON_DEVICE)
             )
         target_compile_definitions(chaining_ota_packaged PRIVATE
             EXIT_AFTER_MS=2000
-            CHAIN_ON_EXIT_ID=0xbacc
+            CHAIN_ON_EXIT_ID=0xbaccbaccbacc
             )
         # Packaged no_flash binary
         pico_set_binary_type(chaining_ota_packaged no_flash)
@@ -274,7 +291,7 @@ if (PICO_ON_DEVICE)
         # Add other bits to partition table
         pico_combine_uf2_outputs(chaining_ota_packaged_combined
             chaining_ota_packaged_pre
-            chaining_xip_ram
+            chaining_tiny
             quick_chain_back
             PARTITIONS 5 6)
         add_dependencies(chaining_ota_packaged_combined chaining_ota_packaged_pre)

@@ -81,7 +81,7 @@
     },
     {
       "name": "Extra A",
-      "id": "0xbacc",
+      "id": "0xbaccbaccbacc",
       "size": "520K",
       "families": ["0xbacc"],
       "permissions": {
@@ -92,7 +92,7 @@
     },
     {
       "name": "Extra B",
-      "id": "0xbacc",
+      "id": "0xbaccbaccbacc",
       "size": "520K",
       "families": ["0xbacc"],
       "permissions": {
